@@ -2,6 +2,13 @@
   <img width="805" height="244" alt="FastInject-removebg-preview" src="https://github.com/user-attachments/assets/3fc74f23-58fb-4064-99c9-b25ed3ca7fca">
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/C%2B%2B-20-00599C?style=for-the-badge&logo=cplusplus&logoColor=white">
+  <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white">
+  <img src="https://img.shields.io/badge/Build-Release-2EA44F?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Visual%20Studio-2022-5C2D91?style=for-the-badge&logo=visualstudio&logoColor=white">
+</p>
+
 
 # Fast Injector
 
