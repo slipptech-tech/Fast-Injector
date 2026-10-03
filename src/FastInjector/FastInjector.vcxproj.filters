@@ -1,0 +1,69 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="gui">
+      <UniqueIdentifier>{c54a97f0-06db-47e7-a36b-7191562debd2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Injector">
+      <UniqueIdentifier>{9d23cb52-a91a-45db-9bbe-83ea96798c17}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="utils">
+      <UniqueIdentifier>{c670dda3-0175-48c8-8682-ed8c1488a8f3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\gui\App.cpp">
+      <Filter>gui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Injector\Injector.cpp">
+      <Filter>Injector</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Injector\ManualMap.cpp">
+      <Filter>Injector</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Injector\PE.cpp">
+      <Filter>Injector</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Injector\Privilege.cpp">
+      <Filter>Injector</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Injector\Process.cpp">
+      <Filter>Injector</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Injector\ProcessList.cpp">
+      <Filter>Injector</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\gui\App.h">
+      <Filter>gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\gui\Theme.h">
+      <Filter>gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Injector\Injector.h">
+      <Filter>Injector</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Injector\ManualMap.h">
+      <Filter>Injector</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Injector\PE.h">
+      <Filter>Injector</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Injector\Privilege.h">
+      <Filter>Injector</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Injector\Process.h">
+      <Filter>Injector</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Injector\ProcessList.h">
+      <Filter>Injector</Filter>
+    </ClInclude>
+    <ClInclude Include="..\utils\Log.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\FastInjector.vcxproj.user" />
+  </ItemGroup>
+</Project>
