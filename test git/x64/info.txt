@@ -1,3 +1,5 @@
 test files for git build.
 test files for version 0.0.3
 
+-- If u think exe files not offical and safe just delete test git folder.
+
