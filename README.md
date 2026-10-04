@@ -208,11 +208,11 @@ you want to build Fast Injector yourself, you can clone the repository using Git
 
 Open PowerShell or Command Prompt and run:
 
-git clone https://github.com/YOUR-USERNAME/YOUR-REPOSITORY.git
+git clone https://github.com/slipptech-tech/Fast-Injector.git
 
 Then enter the project directory:
 
-cd YOUR-REPOSITORY
+cd C:\Users\(yourname)\Downloads\FastInjector\
 
 
 ## Disclaimer
