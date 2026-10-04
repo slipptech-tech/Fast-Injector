@@ -12,47 +12,13 @@
   imgui_widgets.cpp
   imgui_impl_dx11.cpp
   imgui_impl_win32.cpp
-C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\14.31.31103\include\xstring(2584,23): warning C4244: аргумент: преобразование "wchar_t" в "const _Elem", возможна потеря данных
-          with
-          [
-              _Elem=char
-          ] (компилируется исходный файл gui\App.cpp)
-C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\14.31.31103\include\xstring(2595): message : выполняется компиляция ссылки на экземпляр шаблон функции "void std::basic_string<char,std::char_traits<char>,std::allocator<char>>::_Construct<wchar_t*>(_Iter,const _Iter,std::input_iterator_tag)"
-          with
-          [
-              _Iter=wchar_t *
-          ] (компилируется исходный файл gui\App.cpp)
-C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\14.31.31103\include\xstring(2595): message : выполняется компиляция ссылки на экземпляр шаблон функции "void std::basic_string<char,std::char_traits<char>,std::allocator<char>>::_Construct<wchar_t*>(_Iter,const _Iter,std::input_iterator_tag)"
-          with
-          [
-              _Iter=wchar_t *
-          ] (компилируется исходный файл gui\App.cpp)
-C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\14.31.31103\include\xstring(2575): message : выполняется компиляция ссылки на экземпляр шаблон функции "void std::basic_string<char,std::char_traits<char>,std::allocator<char>>::_Construct<wchar_t*>(const _Iter,const _Iter,std::forward_iterator_tag)"
-          with
-          [
-              _Iter=wchar_t *
-          ] (компилируется исходный файл gui\App.cpp)
-C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\14.31.31103\include\xstring(2575): message : выполняется компиляция ссылки на экземпляр шаблон функции "void std::basic_string<char,std::char_traits<char>,std::allocator<char>>::_Construct<wchar_t*>(const _Iter,const _Iter,std::forward_iterator_tag)"
-          with
-          [
-              _Iter=wchar_t *
-          ] (компилируется исходный файл gui\App.cpp)
-C:\Users\metki\Downloads\Fast Injector\src\FastInjector\gui\App.cpp(319): message : выполняется компиляция ссылки на экземпляр шаблон функции "std::basic_string<char,std::char_traits<char>,std::allocator<char>>::basic_string<std::_String_iterator<std::_String_val<std::_Simple_types<_Elem>>>,0>(_Iter,_Iter,const _Alloc &)"
-          with
-          [
-              _Elem=wchar_t,
-              _Iter=std::_String_iterator<std::_String_val<std::_Simple_types<wchar_t>>>,
-              _Alloc=std::allocator<char>
-          ]
-C:\Users\metki\Downloads\Fast Injector\src\FastInjector\gui\App.cpp(319): message : выполняется компиляция ссылки на экземпляр шаблон функции "std::basic_string<char,std::char_traits<char>,std::allocator<char>>::basic_string<std::_String_iterator<std::_String_val<std::_Simple_types<_Elem>>>,0>(_Iter,_Iter,const _Alloc &)"
-          with
-          [
-              _Elem=wchar_t,
-              _Iter=std::_String_iterator<std::_String_val<std::_Simple_types<wchar_t>>>,
-              _Alloc=std::allocator<char>
-          ]
-  Создание кода
+//
+Closed error functions
+Closed FastInjector.log code.
+//
+
+Creating Code
   Previous IPDB not found, fall back to full compilation.
   All 2929 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
-  Создание кода завершено
+  Creating Code Complete
   FastInjector.vcxproj -> C:\Users\metki\Downloads\Fast Injector\src\FastInjector\x64\Release\FastInjector.exe
