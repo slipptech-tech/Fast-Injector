@@ -1,9 +1,9 @@
 #include "App.h"
 #include "Theme.h"
-#include "../injector/Injector.h"
-#include "../injector/ManualMap.h"
-#include "../injector/Process.h"
-#include "../injector/Privilege.h"
+#include "../Injector/Injector.h"
+#include "../Injector/ManualMap.h"
+#include "../Injector/Process.h"
+#include "../Injector/Privilege.h"
 #include "../utils/Log.h"
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_dx11.h>
@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <commdlg.h>
 #include <shellapi.h>
+#include <fstream>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -73,7 +74,6 @@ void Resize() {
 
 LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     if (ImGui_ImplWin32_WndProcHandler(h, m, w, l)) return true;
-
     switch (m) {
         case WM_SIZE:
             if (w != SIZE_MINIMIZED) Resize();
@@ -94,8 +94,6 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
                         std::filesystem::path fp(p);
                         App::state.dllName = fp.filename().string();
                         Log::Ok("DLL dropped: " + p);
-                    } else {
-                        Log::Warn("Not a DLL: " + p);
                     }
                 }
             }
@@ -109,6 +107,27 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     return DefWindowProc(h, m, w, l);
 }
 
+std::string DetectDllArch(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return "unknown";
+
+    IMAGE_DOS_HEADER dos{};
+    f.read((char*)&dos, sizeof(dos));
+    if (dos.e_magic != IMAGE_DOS_SIGNATURE) return "unknown";
+
+    f.seekg(dos.e_lfanew);
+    DWORD sig = 0;
+    f.read((char*)&sig, sizeof(sig));
+    if (sig != IMAGE_NT_SIGNATURE) return "unknown";
+
+    IMAGE_FILE_HEADER fh{};
+    f.read((char*)&fh, sizeof(fh));
+
+    if (fh.Machine == IMAGE_FILE_MACHINE_AMD64) return "x64";
+    if (fh.Machine == IMAGE_FILE_MACHINE_I386)  return "x86";
+    return "unknown";
+}
+
 void RefreshProcs() {
     App::state.procs = ProcessList::Snapshot();
     App::state.selectedProc = -1;
@@ -118,17 +137,10 @@ void RefreshProcs() {
 void DoInject() {
     auto& s = App::state;
     if (s.selectedProc < 0 || s.selectedProc >= (int)s.procs.size()) {
-        Log::Err("No process selected");
-        return;
+        Log::Err("No process selected"); return;
     }
-    if (s.dllPath.empty()) {
-        Log::Err("No DLL selected");
-        return;
-    }
-    if (s.busy) {
-        Log::Warn("Injection already in progress");
-        return;
-    }
+    if (s.dllPath.empty()) { Log::Err("No DLL selected"); return; }
+    if (s.busy) { Log::Warn("Injection already in progress"); return; }
 
     s.busy = true;
     s.statusText = "Injecting...";
@@ -137,10 +149,14 @@ void DoInject() {
     ProcInfo proc = s.procs[s.selectedProc];
     int mode = s.mode;
     std::string path = s.dllPath;
+    int delayMs = s.injectDelayMs;
     std::filesystem::path fp(path);
     std::string name = fp.filename().string();
 
-    std::thread([proc, mode, path, name]() {
+    std::thread([proc, mode, path, name, delayMs]() {
+        if (delayMs > 0)
+            std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
+
         bool ok = (mode == 0)
             ? Injector::InjectLoadLibrary(proc.pid, path)
             : ManualMap::Inject(proc.pid, path);
@@ -160,17 +176,10 @@ void DoInject() {
 void DoEject() {
     auto& s = App::state;
     if (s.selectedProc < 0 || s.selectedProc >= (int)s.procs.size()) {
-        Log::Err("Eject: no process selected");
-        return;
+        Log::Err("Eject: no process selected"); return;
     }
-    if (s.dllName.empty()) {
-        Log::Err("Eject: no DLL name known — inject first");
-        return;
-    }
-    if (s.busy) {
-        Log::Warn("Eject: another operation in progress");
-        return;
-    }
+    if (s.dllName.empty()) { Log::Err("Eject: no DLL name known"); return; }
+    if (s.busy) return;
 
     s.busy = true;
     s.statusText = "Ejecting...";
@@ -207,8 +216,312 @@ void BrowseDll() {
         App::state.dllPath = buf;
         std::filesystem::path fp(buf);
         App::state.dllName = fp.filename().string();
-        Log::Ok("DLL selected: " + App::state.dllPath);
+        App::state.dllArch = DetectDllArch(buf);
+        App::state.dllArchValid = (App::state.dllArch != "unknown");
+        Log::Ok("DLL selected: " + App::state.dllPath + "  [" + App::state.dllArch + "]");
     }
+}
+
+// ==== UI ====
+
+void DrawSidebar() {
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, Theme::BgPanel);
+    ImGui::BeginChild("##sidebar", ImVec2(230, 0), true);
+
+    ImGui::Dummy(ImVec2(0, 6));
+
+    // Логотип
+    ImGui::PushFont(Theme::FontLogo);
+    ImGui::PushStyleColor(ImGuiCol_Text, Theme::Accent);
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4);
+    ImGui::Text("Fast");
+    ImGui::SameLine(0, 0);
+    ImGui::PushStyleColor(ImGuiCol_Text, Theme::Text);
+    ImGui::Text("Injector");
+    ImGui::PopStyleColor();
+    ImGui::PopStyleColor();
+    ImGui::PopFont();
+
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4);
+    ImGui::TextDisabled("version 2.0");
+
+    ImGui::Dummy(ImVec2(0, 22));
+    ImGui::PushStyleColor(ImGuiCol_Separator, Theme::Border);
+    ImGui::Separator();
+    ImGui::PopStyleColor();
+    ImGui::Dummy(ImVec2(0, 10));
+
+    ImVec2 btnSize(190, 44);
+
+    if (Theme::NavButton("   Inject",   App::state.navIndex == 0, btnSize)) App::state.navIndex = 0;
+    ImGui::Dummy(ImVec2(0, 4));
+    if (Theme::NavButton("   Settings", App::state.navIndex == 1, btnSize)) App::state.navIndex = 1;
+    ImGui::Dummy(ImVec2(0, 4));
+    if (Theme::NavButton("   Log",      App::state.navIndex == 2, btnSize)) App::state.navIndex = 2;
+    ImGui::Dummy(ImVec2(0, 4));
+    if (Theme::NavButton("   About",    App::state.navIndex == 3, btnSize)) App::state.navIndex = 3;
+
+    // Статус снизу
+    float statusY = ImGui::GetWindowHeight() - 76;
+    ImGui::SetCursorPosY(statusY);
+    ImGui::PushStyleColor(ImGuiCol_Separator, Theme::Border);
+    ImGui::Separator();
+    ImGui::PopStyleColor();
+    ImGui::Dummy(ImVec2(0, 6));
+
+    ImVec4 col = Theme::TextMuted;
+    if (App::state.statusText.rfind("Failed", 0) == 0)         col = Theme::Danger;
+    else if (App::state.statusText.rfind("Injected", 0) == 0)  col = Theme::Success;
+    else if (App::state.statusText.rfind("Ejected", 0) == 0)   col = Theme::Warning;
+    else if (App::state.statusText.rfind("Injecting", 0) == 0) col = Theme::Accent;
+
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4);
+    ImGui::PushStyleColor(ImGuiCol_Text, Theme::TextMuted);
+    ImGui::Text("status");
+    ImGui::PopStyleColor();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4);
+    ImGui::PushStyleColor(ImGuiCol_Text, col);
+    ImGui::PushFont(Theme::FontMedium);
+    ImGui::TextWrapped("%s", App::state.statusText.c_str());
+    ImGui::PopFont();
+    ImGui::PopStyleColor();
+
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+}
+
+void DrawInjectTab() {
+    auto& s = App::state;
+
+    float availH = ImGui::GetContentRegionAvail().y;
+    float leftW = 430.0f;
+
+    // === ЛЕВАЯ — ПРОЦЕССЫ ===
+    Theme::BeginCard("##procs", ImVec2(leftW, availH));
+
+    Theme::SectionHeader("Processes");
+
+    if (ImGui::SmallButton("  Refresh  ")) { RefreshProcs(); s.lastRefresh = GetTickCount64(); }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-1);
+    ImGui::InputTextWithHint("##filter", "Search...", s.procFilter, 64);
+
+    ImGui::Dummy(ImVec2(0, 6));
+
+    std::string filter = s.procFilter;
+    for (auto& c : filter) c = (char)tolower(c);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 6));
+    if (ImGui::BeginListBox("##list", ImVec2(-1, -1))) {
+        for (int i = 0; i < (int)s.procs.size(); ++i) {
+            const auto& p = s.procs[i];
+            std::wstring wn = p.name;
+            std::string n(wn.begin(), wn.end());
+            std::string lower = n;
+            for (auto& c : lower) c = (char)tolower(c);
+            if (!filter.empty() && lower.find(filter) == std::string::npos) continue;
+
+            bool selected = (s.selectedProc == i);
+
+            if (selected)
+                ImGui::PushStyleColor(ImGuiCol_Header, Theme::AccentSoft);
+
+            std::string label = "  " + n + "##" + std::to_string(i);
+            if (ImGui::Selectable(label.c_str(), selected, 0, ImVec2(0, 26))) {
+                s.selectedProc = i;
+                Log::Info("Selected: " + n + " PID " + std::to_string(p.pid));
+            }
+
+            // PID справа
+            ImGui::SameLine(ImGui::GetWindowWidth() - 80);
+            ImGui::PushStyleColor(ImGuiCol_Text, Theme::TextMuted);
+            ImGui::Text("%lu", p.pid);
+            ImGui::PopStyleColor();
+
+            if (selected)
+                ImGui::PopStyleColor();
+        }
+        ImGui::EndListBox();
+    }
+    ImGui::PopStyleVar();
+
+    Theme::EndCard();
+
+    ImGui::SameLine();
+
+    // === ПРАВАЯ — DLL + УПРАВЛЕНИЕ ===
+    Theme::BeginCard("##right", ImVec2(0, availH));
+
+    Theme::SectionHeader("Target DLL");
+
+    if (s.dllPath.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, Theme::TextMuted);
+        ImGui::TextWrapped("No file selected. Click Browse or drop a .dll here.");
+        ImGui::PopStyleColor();
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Text, Theme::Text);
+        ImGui::TextWrapped("%s", s.dllPath.c_str());
+        ImGui::PopStyleColor();
+        ImGui::Dummy(ImVec2(0, 4));
+
+        if (s.dllArchValid) {
+            ImVec4 archCol = (s.dllArch == "x64") ? Theme::Success : Theme::Warning;
+            ImGui::PushStyleColor(ImGuiCol_Text, archCol);
+            ImGui::Text("Architecture: %s", s.dllArch.c_str());
+            ImGui::PopStyleColor();
+        } else {
+            ImGui::TextDisabled("Architecture: unknown");
+        }
+    }
+
+    ImGui::Dummy(ImVec2(0, 6));
+    if (ImGui::Button("Browse...", ImVec2(130, 36))) BrowseDll();
+    ImGui::SameLine();
+    if (ImGui::Button("Clear", ImVec2(90, 36))) {
+        s.dllPath.clear(); s.dllName.clear();
+        s.dllArch = "unknown"; s.dllArchValid = false;
+        Log::Info("DLL cleared");
+    }
+
+    ImGui::Dummy(ImVec2(0, 16));
+    Theme::SectionHeader("Injection method");
+
+    ImGui::RadioButton("LoadLibrary  (safe)", &s.mode, 0);
+    ImGui::Dummy(ImVec2(0, 4));
+    ImGui::RadioButton("ManualMap  (stealth)", &s.mode, 1);
+
+    ImGui::Dummy(ImVec2(0, 16));
+    Theme::SectionHeader("Options");
+
+    ImGui::Checkbox("Auto refresh process list", &s.autoRefresh);
+
+    ImGui::Dummy(ImVec2(0, 20));
+
+    // INJECT / EJECT
+    float rightW = ImGui::GetContentRegionAvail().x;
+    float gap = 12.0f;
+    float btnW = (rightW - gap) / 2.0f;
+
+    if (s.busy) ImGui::BeginDisabled();
+    if (Theme::AccentButton(s.busy ? "Working..." : "INJECT", ImVec2(btnW, 52))) DoInject();
+    if (s.busy) ImGui::EndDisabled();
+
+    ImGui::SameLine();
+
+    if (s.busy) ImGui::BeginDisabled();
+    if (Theme::DangerButton(s.busy ? "Working..." : "EJECT", ImVec2(btnW, 52))) DoEject();
+    if (s.busy) ImGui::EndDisabled();
+
+    ImGui::Dummy(ImVec2(0, 10));
+    ImGui::PushStyleColor(ImGuiCol_Text, Theme::TextMuted);
+    ImGui::Text("Hotkeys: Ctrl+I = Inject, Ctrl+E = Eject");
+    ImGui::PopStyleColor();
+
+    Theme::EndCard();
+}
+
+void DrawSettingsTab() {
+    auto& s = App::state;
+
+    Theme::BeginCard("##settings", ImVec2(0, 0));
+
+    Theme::SectionHeader("Injection");
+
+    ImGui::Checkbox("Auto-inject when process appears", &s.autoInject);
+    ImGui::Dummy(ImVec2(0, 6));
+    ImGui::Checkbox("Auto-eject on injector close", &s.autoEject);
+    ImGui::Dummy(ImVec2(0, 10));
+    ImGui::SetNextItemWidth(320);
+    ImGui::SliderInt("Inject delay", &s.injectDelayMs, 0, 5000, "%d ms");
+
+    ImGui::Dummy(ImVec2(0, 24));
+    Theme::SectionHeader("Interface");
+
+    ImGui::SetNextItemWidth(320);
+    ImGui::SliderFloat("Window opacity", &s.windowOpacity, 0.5f, 1.0f, "%.2f");
+
+    ImGui::Dummy(ImVec2(0, 24));
+    if (ImGui::Button("Reset to defaults", ImVec2(200, 40))) {
+        s.autoInject = false;
+        s.autoEject = false;
+        s.injectDelayMs = 0;
+        s.windowOpacity = 0.96f;
+        Log::Info("Settings reset");
+    }
+
+    Theme::EndCard();
+}
+
+void DrawLogTab() {
+    Theme::BeginCard("##logtab", ImVec2(0, 0));
+
+    Theme::SectionHeader("Log");
+
+    if (ImGui::SmallButton("  Clear  ")) Log::Clear();
+    ImGui::Dummy(ImVec2(0, 6));
+
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, Theme::BgPanel);
+    if (ImGui::BeginChild("##logscroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar)) {
+        std::lock_guard<std::mutex> g(Log::mtx);
+        for (auto& e : Log::buffer) {
+            ImVec4 col;
+            switch (e.lvl) {
+                case Log::INFO: col = Theme::Text;        break;
+                case Log::OK:   col = Theme::Success;     break;
+                case Log::WARN: col = Theme::Warning;     break;
+                case Log::ERR:  col = Theme::Danger;      break;
+                default:        col = Theme::Text;        break;
+            }
+            ImGui::PushStyleColor(ImGuiCol_Text, Theme::TextMuted);
+            ImGui::Text("[%s]", e.time.c_str());
+            ImGui::PopStyleColor();
+            ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Text, col);
+            ImGui::TextWrapped("%s", e.msg.c_str());
+            ImGui::PopStyleColor();
+        }
+        if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 20.f)
+            ImGui::SetScrollHereY(1.f);
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+
+    Theme::EndCard();
+}
+
+void DrawAboutTab() {
+    Theme::BeginCard("##about", ImVec2(0, 0));
+
+    ImGui::PushFont(Theme::FontLogo);
+    ImGui::PushStyleColor(ImGuiCol_Text, Theme::Accent);
+    ImGui::Text("Fast");
+    ImGui::SameLine(0, 0);
+    ImGui::PushStyleColor(ImGuiCol_Text, Theme::Text);
+    ImGui::Text("Injector");
+    ImGui::PopStyleColor();
+    ImGui::PopStyleColor();
+    ImGui::PopFont();
+
+    ImGui::TextDisabled("version 2.0");
+    ImGui::Dummy(ImVec2(0, 16));
+    ImGui::PushStyleColor(ImGuiCol_Separator, Theme::Border);
+    ImGui::Separator();
+    ImGui::PopStyleColor();
+    ImGui::Dummy(ImVec2(0, 16));
+
+    ImGui::TextWrapped("External DLL injector for Windows processes.");
+    ImGui::Dummy(ImVec2(0, 12));
+
+    ImGui::TextDisabled("Supported methods:");
+    ImGui::BulletText("LoadLibrary (classic)");
+    ImGui::BulletText("ManualMap (stealth)");
+
+    ImGui::Dummy(ImVec2(0, 16));
+    ImGui::TextDisabled("Hotkeys:");
+    ImGui::BulletText("Ctrl + I   Inject");
+    ImGui::BulletText("Ctrl + E   Eject");
+
+    Theme::EndCard();
 }
 
 } // namespace
@@ -219,7 +532,7 @@ bool App::Init() {
     wc.lpfnWndProc = WndProc;
     wc.hInstance = GetModuleHandle(nullptr);
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)CreateSolidBrush(RGB(18, 18, 22));
+    wc.hbrBackground = (HBRUSH)CreateSolidBrush(RGB(11, 11, 15));
     wc.lpszClassName = L"FastInjectorWnd";
     RegisterClassExW(&wc);
 
@@ -244,6 +557,8 @@ bool App::Init() {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr;
+
+    Theme::LoadFonts();
     Theme::Apply();
 
     ImGui_ImplWin32_Init(hwnd);
@@ -251,7 +566,7 @@ bool App::Init() {
 
     RefreshProcs();
     state.lastRefresh = GetTickCount64();
-    state.statusText = "Idle";
+    state.statusText = "Ready";
     return true;
 }
 
@@ -273,163 +588,44 @@ void App::Frame() {
         }
     }
 
+    bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+    if (ctrl && (GetAsyncKeyState('I') & 1)) DoInject();
+    if (ctrl && (GetAsyncKeyState('E') & 1)) DoEject();
+
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::SetNextWindowPos({0, 0});
-    ImGui::SetNextWindowSize({(float)width, (float)height});
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImVec2((float)width, (float)height));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::Begin("Fast Injector", nullptr,
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-        ImGuiWindowFlags_NoBringToFrontOnFocus);
+        ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoScrollbar);
+    ImGui::PopStyleVar();
 
-    // Header
-    ImGui::PushStyleColor(ImGuiCol_Text, {0.55f, 0.75f, 1.f, 1.f});
-    ImGui::Text("FAST INJECTOR");
-    ImGui::PopStyleColor();
+    DrawSidebar();
     ImGui::SameLine();
-    ImGui::TextDisabled("v1.0");
-    ImGui::SameLine(ImGui::GetWindowWidth() - 220);
-    ImGui::TextDisabled("status: %s", state.statusText.c_str());
-    ImGui::Separator();
-    ImGui::Spacing();
 
-    const float logHeight = 160.f;
-    const float contentHeight = ImGui::GetContentRegionAvail().y - logHeight - 12.f;
-    const float leftWidth = 360.f;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20, 20));
+    ImGui::BeginChild("##content", ImVec2(0, 0), false,
+        ImGuiWindowFlags_NoScrollbar);
+    ImGui::PopStyleVar();
 
-    // Left — processes
-    ImGui::BeginChild("##procs", {leftWidth, contentHeight}, true);
-    ImGui::Text("Processes");
-    ImGui::SameLine();
-    if (ImGui::SmallButton("refresh")) { RefreshProcs(); state.lastRefresh = GetTickCount64(); }
-    ImGui::SetNextItemWidth(-1);
-    ImGui::InputTextWithHint("##filter", "search process...", state.procFilter, 64);
-    ImGui::Spacing();
-
-    std::string filter = state.procFilter;
-    for (auto& c : filter) c = (char)tolower(c);
-
-    if (ImGui::BeginListBox("##list", {-1, -1})) {
-        for (int i = 0; i < (int)state.procs.size(); ++i) {
-            const auto& p = state.procs[i];
-            std::wstring wn = p.name;
-            std::string n(wn.begin(), wn.end());
-            std::string lower = n;
-            for (auto& c : lower) c = (char)tolower(c);
-
-            if (!filter.empty() && lower.find(filter) == std::string::npos)
-                continue;
-
-            std::string label = n + "   [" + std::to_string(p.pid) + "]##" + std::to_string(i);
-            bool selected = (state.selectedProc == i);
-            if (ImGui::Selectable(label.c_str(), selected)) {
-                state.selectedProc = i;
-                Log::Info("Selected: " + n + " PID " + std::to_string(p.pid));
-            }
-        }
-        ImGui::EndListBox();
+    switch (state.navIndex) {
+        case 0: DrawInjectTab();   break;
+        case 1: DrawSettingsTab(); break;
+        case 2: DrawLogTab();      break;
+        case 3: DrawAboutTab();    break;
     }
-    ImGui::EndChild();
-
-    ImGui::SameLine();
-
-    // Right — DLL + mode + inject + eject
-    ImGui::BeginChild("##right", {0, contentHeight}, true);
-    ImGui::Text("Target DLL");
-    ImGui::Spacing();
-
-    if (state.dllPath.empty()) {
-        ImGui::TextDisabled("(no file selected)");
-    } else {
-        ImGui::TextWrapped("%s", state.dllPath.c_str());
-    }
-    ImGui::Spacing();
-
-    if (ImGui::Button("Browse...", {130, 32})) BrowseDll();
-    ImGui::SameLine();
-    if (ImGui::Button("Clear", {90, 32})) {
-        state.dllPath.clear();
-        state.dllName.clear();
-        Log::Info("DLL cleared");
-    }
-    ImGui::SameLine();
-    ImGui::TextDisabled("or drop .dll here");
-
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    ImGui::Text("Injection method");
-    ImGui::Spacing();
-    ImGui::RadioButton("LoadLibrary (safe, classic)", &state.mode, 0);
-    ImGui::RadioButton("ManualMap  (stealth)", &state.mode, 1);
-
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    ImGui::Checkbox("Auto refresh process list", &state.autoRefresh);
-
-    ImGui::Spacing();
-    ImGui::Spacing();
-
-    // INJECT + EJECT side by side
-    float availW = ImGui::GetContentRegionAvail().x;
-    float gap = 8.f;
-    float btnW = (availW - gap) / 2.f;
-
-    ImGui::PushStyleColor(ImGuiCol_Button,        {0.18f, 0.42f, 0.75f, 1.f});
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {0.24f, 0.52f, 0.90f, 1.f});
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  {0.30f, 0.60f, 1.00f, 1.f});
-    if (state.busy) ImGui::BeginDisabled();
-    if (ImGui::Button(state.busy ? "..." : "INJECT", {btnW, 46})) DoInject();
-    if (state.busy) ImGui::EndDisabled();
-    ImGui::PopStyleColor(3);
-
-    ImGui::SameLine();
-
-    ImGui::PushStyleColor(ImGuiCol_Button,        {0.62f, 0.20f, 0.20f, 1.f});
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {0.78f, 0.28f, 0.28f, 1.f});
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  {0.90f, 0.34f, 0.34f, 1.f});
-    if (state.busy) ImGui::BeginDisabled();
-    if (ImGui::Button(state.busy ? "..." : "EJECT", {btnW, 46})) DoEject();
-    if (state.busy) ImGui::EndDisabled();
-    ImGui::PopStyleColor(3);
-
-    ImGui::EndChild();
-
-    // Log
-    ImGui::BeginChild("##log", {0, logHeight}, true);
-    ImGui::Text("Log");
-    ImGui::SameLine();
-    if (ImGui::SmallButton("clear")) Log::Clear();
-    ImGui::Separator();
-
-    if (ImGui::BeginChild("##logscroll", {0, 0}, false, ImGuiWindowFlags_HorizontalScrollbar)) {
-        std::lock_guard<std::mutex> g(Log::mtx);
-        for (auto& e : Log::buffer) {
-            ImVec4 col;
-            switch (e.lvl) {
-                case Log::INFO: col = {0.80f, 0.82f, 0.88f, 1.f}; break;
-                case Log::OK:   col = {0.40f, 1.00f, 0.55f, 1.f}; break;
-                case Log::WARN: col = {1.00f, 0.80f, 0.30f, 1.f}; break;
-                case Log::ERR:  col = {1.00f, 0.42f, 0.42f, 1.f}; break;
-                default:        col = {1,1,1,1};
-            }
-            ImGui::TextColored(col, "[%s] %s", e.time.c_str(), e.msg.c_str());
-        }
-        if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 20.f)
-            ImGui::SetScrollHereY(1.f);
-    }
-    ImGui::EndChild();
     ImGui::EndChild();
 
     ImGui::End();
 
     ImGui::Render();
-    const float clear[4] = {0.07f, 0.07f, 0.09f, 1.f};
+    const float clear[4] = { 0.043f, 0.043f, 0.059f, 1.0f };
     context->OMSetRenderTargets(1, &rtv, nullptr);
     context->ClearRenderTargetView(rtv, clear);
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
