@@ -16,17 +16,6 @@
   <img src="https://img.shields.io/github/forks/slipptech-tech/Fast-Injector?style=for-the-badge&logo=github&label=Forks">
   <img src="https://img.shields.io/github/issues/slipptech-tech/Fast-Injector?style=for-the-badge&logo=github&label=Issues">
   <img src="https://img.shields.io/github/last-commit/slipptech-tech/Fast-Injector?style=for-the-badge&logo=github&label=Last%20Commit">
-  <img src="https://img.shields.io/github/repo-size/slipptech-tech/Fast-Injector?style=for-the-badge&logo=github&label=Repo%20Size">
-  <img src="https://img.shields.io/github/downloads/slipptech-tech/Fast-Injector/total?style=for-the-badge&logo=github&label=Downloads">
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/MSVC-Supported-5C2D91?style=for-the-badge&logo=visualstudio&logoColor=white">
-  <img src="https://img.shields.io/badge/CMake-Supported-064F8C?style=for-the-badge&logo=cmake&logoColor=white">
-  <img src="https://img.shields.io/badge/WinAPI-Supported-0078D6?style=for-the-badge&logo=windows&logoColor=white">
-  <img src="https://img.shields.io/badge/x64-Supported-555555?style=for-the-badge">
-  <img src="https://img.shields.io/badge/x86-Supported-555555?style=for-the-badge">
-</p>
 
 
 # Fast Injector
